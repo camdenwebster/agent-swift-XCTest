@@ -7,15 +7,34 @@
 //
 
 import Foundation
+
+#if os(iOS)
 import UIKit
+#endif
+
+#if os(macOS)
+import AppKit
+#endif
 
 enum TagHelper {
   
-  static let defaultTags = [
-    UIDevice.current.systemName,
-    UIDevice.current.systemVersion,
-    UIDevice.current.modelName,
-    UIDevice.current.model
-  ]
+  static var defaultTags: [String] {
+    #if os(iOS)
+    return [
+      UIDevice.current.systemName,
+      UIDevice.current.systemVersion,
+      UIDevice.current.modelName,
+      UIDevice.current.model
+    ]
+    #elseif os(macOS)
+    return [
+      "macOS",
+      ProcessInfo.processInfo.operatingSystemVersionString,
+      "Mac",
+      Host.current().localizedName ?? "Unknown Host"
+    ]
+    #endif
+  }
   
 }
+
