@@ -5,7 +5,7 @@
 //  Created by Windmill Smart Solutions on 7/5/17.
 //  Copyright © 2017 Oxagile. All rights reserved.
 //
-
+#if os(iOS)
 import Foundation
 import UIKit
 
@@ -67,3 +67,4 @@ public extension UIDevice {
   }
   
 }
+#endif
