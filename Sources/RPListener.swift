@@ -21,54 +21,89 @@ public class RPListener: NSObject, XCTestObservation {
     XCTestObservationCenter.shared.addTestObserver(self)
   }
   
-  private func readConfiguration(from testBundle: Bundle) -> AgentConfiguration {
-    guard
-      let bundlePath = testBundle.path(forResource: "Info", ofType: "plist"),
-      let bundleProperties = NSDictionary(contentsOfFile: bundlePath) as? [String: Any],
-      let shouldReport = bundleProperties["PushTestDataToReportPortal"] as? Bool,
-      let portalPath = bundleProperties["ReportPortalURL"] as? String,
-      let portalURL = URL(string: portalPath),
-      let projectName = bundleProperties["ReportPortalProjectName"] as? String,
-      let token = bundleProperties["ReportPortalToken"] as? String,
-      let shouldFinishLaunch = bundleProperties["IsFinalTestBundle"] as? Bool,
-      let launchName = bundleProperties["ReportPortalLaunchName"] as? String else
-    {
-      fatalError("Configure properties for report portal in the Info.plist")
-    }
-    var tags: [String] = []
-    if let tagString = bundleProperties["ReportPortalTags"] as? String {
-      tags = tagString.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines).components(separatedBy: ",")
-    }
-    var launchMode: LaunchMode = .default
-    if let isDebug = bundleProperties["IsDebugLaunchMode"] as? Bool, isDebug == true {
-      launchMode = .debug
-    }
+    private func readConfiguration(from testBundle: Bundle) -> AgentConfiguration {
+        let infoPlistPath: String?
+        
+        #if os(macOS)
+        if let bundlePath = testBundle.bundlePath as NSString? {
+            infoPlistPath = bundlePath.appendingPathComponent("Contents/Info.plist")
+        } else {
+            infoPlistPath = nil
+        }
+        #else
+        infoPlistPath = testBundle.path(forResource: "Info", ofType: "plist")
+        #endif
 
-    var testNameRules: NameRules = []
-    if let rules = bundleProperties["TestNameRules"] as? [String: Bool] {
-      if rules["StripTestPrefix"] == true {
-        testNameRules.update(with: .stripTestPrefix)
+        guard
+        let bundlePath = infoPlistPath else {
+              fatalError("Info.plist not found")
+        }
+        guard
+        let bundleProperties = NSDictionary(contentsOfFile: bundlePath) as? [String: Any] else {
+          fatalError("Could not read contents of Info.plist")
+        }
+        guard
+        let shouldReport = bundleProperties["PushTestDataToReportPortal"] as? Bool else {
+          fatalError("Missing key: PushTestDataToReportPortal")
+        }
+        guard
+        let portalPath = bundleProperties["ReportPortalURL"] as? String else {
+          fatalError("Missing key: ReportPortalURL")
+        }
+        guard
+        let portalURL = URL(string: portalPath) else {
+          fatalError("Invalid URL string: \(portalPath)")
+        }
+        guard
+        let projectName = bundleProperties["ReportPortalProjectName"] as? String else {
+          fatalError("Missing key: ReportPortalProjectName")
+        }
+        guard
+        let token = bundleProperties["ReportPortalToken"] as? String else {
+          fatalError("Missing key: ReportPortalToken")
+        }
+        guard
+        let shouldFinishLaunch = bundleProperties["IsFinalTestBundle"] as? Bool else {
+          fatalError("Missing key: IsFinalTestBundle")
+        }
+        guard
+        let launchName = bundleProperties["ReportPortalLaunchName"] as? String else {
+          fatalError("Missing key: ReportPortalLaunchName")
+        }
+        var tags: [String] = []
+        if let tagString = bundleProperties["ReportPortalTags"] as? String {
+          tags = tagString.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines).components(separatedBy: ",")
+        }
+        var launchMode: LaunchMode = .default
+        if let isDebug = bundleProperties["IsDebugLaunchMode"] as? Bool, isDebug == true {
+          launchMode = .debug
+        }
+
+        var testNameRules: NameRules = []
+        if let rules = bundleProperties["TestNameRules"] as? [String: Bool] {
+          if rules["StripTestPrefix"] == true {
+            testNameRules.update(with: .stripTestPrefix)
+          }
+          if rules["WhiteSpaceOnUnderscore"] == true {
+            testNameRules.update(with: .whiteSpaceOnUnderscore)
+          }
+          if rules["WhiteSpaceOnCamelCase"] == true {
+            testNameRules.update(with: .whiteSpaceOnCamelCase)
+          }
+        }
+
+        return AgentConfiguration(
+          reportPortalURL: portalURL,
+          projectName: projectName,
+          launchName: launchName,
+          shouldSendReport: shouldReport,
+          portalToken: token,
+          tags: tags,
+          shouldFinishLaunch: shouldFinishLaunch,
+          launchMode: launchMode,
+          testNameRules: testNameRules
+        )
       }
-      if rules["WhiteSpaceOnUnderscore"] == true {
-        testNameRules.update(with: .whiteSpaceOnUnderscore)
-      }
-      if rules["WhiteSpaceOnCamelCase"] == true {
-        testNameRules.update(with: .whiteSpaceOnCamelCase)
-      }
-    }
-    
-    return AgentConfiguration(
-      reportPortalURL: portalURL,
-      projectName: projectName,
-      launchName: launchName,
-      shouldSendReport: shouldReport,
-      portalToken: token,
-      tags: tags,
-      shouldFinishLaunch: shouldFinishLaunch,
-      launchMode: launchMode,
-      testNameRules: testNameRules
-    )
-  }
   
   public func testBundleWillStart(_ testBundle: Bundle) {
     let configuration = readConfiguration(from: testBundle)
