@@ -1,12 +1,12 @@
 //  Created by Ruslan Popesku on 10/22/25.
 //  Copyright 2025 EPAM Systems
-//  
+//
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
 //  You may obtain a copy of the License at
-//  
+//
 //      https://www.apache.org/licenses/LICENSE-2.0
-//  
+//
 //  Unless required by applicable law or agreed to in writing, software
 //  distributed under the License is distributed on an "AS IS" BASIS,
 //  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -36,7 +36,7 @@ public final class ReportingService: Sendable {
     ) {
         self.configuration = configuration
         self.operationTracker = operationTracker
-        
+
         // Build V2 API base URL: https://reportportal.epam.com/api/v2/{project}
         // User provides: https://reportportal.epam.com
         let baseURL = configuration.reportPortalURL
@@ -66,7 +66,8 @@ public final class ReportingService: Sendable {
     /// - **Idempotent**: Multiple calls with same UUID return same launch
     /// - **409 Conflict**: Expected when launch already exists (caller should handle gracefully)
     /// - **Parallel-safe**: All workers can call simultaneously with same UUID
-    func startLaunch(name: String, tags: [String], attributes: [[String: String]], uuid: String) async throws -> String {
+    func startLaunch(name: String, tags: [String], attributes: [[String: String]], uuid: String) async throws -> String
+    {
         let endPoint = StartLaunchEndPoint(
             launchName: name,
             tags: tags,
@@ -100,7 +101,9 @@ public final class ReportingService: Sendable {
     ///   - operation: SuiteOperation with metadata
     ///   - launchID: Parent launch ID
     /// - Returns: Suite item ID (UUID string)
-    func startSuite(operation: SuiteOperation, launchID: String) async throws -> String {
+    func startSuite(operation: SuiteOperation, launchID: String, attributes: [[String: String]] = []) async throws
+        -> String
+    {
         let endPoint: StartItemEndPoint
 
         if let rootSuiteID = operation.rootSuiteID {
@@ -110,14 +113,16 @@ public final class ReportingService: Sendable {
                 itemName: operation.suiteName,
                 parentID: rootSuiteID,
                 launchID: launchID,
-                type: .test  // Test class = type .test
+                type: .test,  // Test class = type .test
+                attributes: attributes
             )
         } else {
             // This is a root suite (bundle)
             endPoint = StartItemEndPoint(
                 itemName: operation.suiteName,
                 launchID: launchID,
-                type: .suite  // Bundle = type .suite
+                type: .suite,  // Bundle = type .suite
+                attributes: attributes
             )
         }
 
@@ -153,12 +158,15 @@ public final class ReportingService: Sendable {
     ///   - operation: TestOperation with metadata
     ///   - launchID: Parent launch ID
     /// - Returns: Test item ID (UUID string)
-    func startTest(operation: TestOperation, launchID: String) async throws -> String {
+    func startTest(operation: TestOperation, launchID: String, attributes: [[String: String]] = []) async throws
+        -> String
+    {
         let endPoint = StartItemEndPoint(
             itemName: operation.testName,
             parentID: operation.suiteID,
             launchID: launchID,
-            type: .step  // Individual test method = type .step
+            type: .step,  // Individual test method = type .step
+            attributes: attributes
         )
 
         let result: Item = try await httpClient.callEndPoint(endPoint)
@@ -173,7 +181,7 @@ public final class ReportingService: Sendable {
         guard let status = operation.status else {
             preconditionFailure("Test status should not be nil when finishing test")
         }
-        
+
         let launchID = LaunchManager.shared.launchID
 
         let endPoint = try FinishItemEndPoint(
@@ -184,7 +192,9 @@ public final class ReportingService: Sendable {
 
         let _: Finish = try await httpClient.callEndPoint(endPoint)
 
-        Logger.shared.info("Test finished: \(operation.testID) with status: \(status.rawValue)", correlationID: operation.correlationID)
+        Logger.shared.info(
+            "Test finished: \(operation.testID) with status: \(status.rawValue)", correlationID: operation.correlationID
+        )
     }
 
     // MARK: - Logging & Attachments
@@ -267,10 +277,12 @@ public final class ReportingService: Sendable {
         for (index, attachment) in attachments.enumerated() {
             // Skip attachments without data
             guard let attachmentData = attachment.data else {
-                Logger.shared.warning("Attachment has no data: \(attachment.name ?? "unknown"), UTI: \(attachment.uniformTypeIdentifier)", correlationID: correlationID)
+                Logger.shared.warning(
+                    "Attachment has no data: \(attachment.name ?? "unknown"), UTI: \(attachment.uniformTypeIdentifier)",
+                    correlationID: correlationID)
                 continue
             }
-            
+
             // Generate safe filename from attachment name or use timestamp
             let timestamp = String(Int64(Date().timeIntervalSince1970 * 1000))
             let baseName = attachment.name ?? "attachment_\(index)"
@@ -331,6 +343,7 @@ public final class ReportingService: Sendable {
 
         let _: LogResponse = try await httpClient.callEndPoint(endPoint)
 
-        Logger.shared.info("Uploaded \(fileAttachments.count) attachments to item: \(itemID)", correlationID: correlationID)
+        Logger.shared.info(
+            "Uploaded \(fileAttachments.count) attachments to item: \(itemID)", correlationID: correlationID)
     }
 }

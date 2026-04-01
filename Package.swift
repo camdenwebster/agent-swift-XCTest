@@ -39,5 +39,9 @@ let package = Package(
             name: "ReportPortalAgent",
             path: "Sources",
             exclude: ["Info.plist"]),
+        .testTarget(
+            name: "ReportPortalAgentTests",
+            dependencies: ["ReportPortalAgent"],
+            path: "Tests"),
     ]
 )
